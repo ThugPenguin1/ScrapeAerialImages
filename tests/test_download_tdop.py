@@ -4,7 +4,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from download_tdop import Tile, build_product_url, normalize_sheet, select_tiles  # noqa: E402
+from download_tdop import (  # noqa: E402
+    TDOP_SHEETS,
+    Tile,
+    build_product_url,
+    normalize_sheet,
+    select_tiles,
+)
 
 
 class TDOPSheetTests(unittest.TestCase):
@@ -25,6 +31,16 @@ class TDOPSheetTests(unittest.TestCase):
         selected = select_tiles(tiles, ["T2-NE-C"], None)
         self.assertEqual([tile.sheet_no for tile in selected], ["2-NE-C"])
         self.assertEqual(selected[0].file_stem, "tdop2nec20250009")
+
+    def test_default_selection_uses_complete_builtin_array(self):
+        selected = select_tiles(None, None, None)
+        self.assertEqual([tile.sheet_no for tile in selected], TDOP_SHEETS)
+        self.assertEqual(len(TDOP_SHEETS), 192)
+        self.assertEqual(len(set(TDOP_SHEETS)), 192)
+
+    def test_duplicate_array_or_cli_sheets_are_deduplicated(self):
+        selected = select_tiles(None, ["1-SE-D", "1-SE-D"], None)
+        self.assertEqual([tile.sheet_no for tile in selected], ["1-SE-D"])
 
 
 if __name__ == "__main__":

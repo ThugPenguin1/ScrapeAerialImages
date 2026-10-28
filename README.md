@@ -2,9 +2,11 @@
 
 ## Download official TDOP tiles by sheet number
 
-`scripts/download_tdop.py` reads the **Table of File Name and Tile Extent** in the LandsD TDOP specification PDF, builds the HKMS OpenData `productView` URL for each sheet (the PDF's `1-SE-D` becomes the URL's `T1-SE-D`), opens the page in Chromium, and clicks its exact **Download** control.
+`scripts/download_tdop.py` builds the HKMS OpenData `productView` URL for each sheet (for example, PDF sheet `1-SE-D` becomes URL parameter `T1-SE-D`), opens the official page in Chromium, and clicks its **Download** control.
 
-The script is deliberately **dry-run by default**. It downloads serially, waits between tiles, records results in `manifest.csv`, and stores files outside the repository by default. The 192-tile specification represents roughly 100 GB at about 520 MB per tile, so select only the sheets you need for a pilot first.
+The script contains an editable `TDOP_SHEETS` list near the top. By default, it uses this list when run without `--pdf` or `--sheet`. The list contains the 192 sheet IDs from the supplied December 2024–January 2025 TDOP specification. You can edit the array directly to choose the default set. Alternatively, pass a PDF to read its tile table, or use one or more `--sheet` arguments for a custom selection.
+
+The script is deliberately **dry-run by default**. It downloads serially, waits between tiles, records results in `manifest.csv`, and stores files outside the repository by default. The full 192-tile set is roughly 100 GB at about 520 MB per tile, so select only the sheets you need for a pilot first.
 
 ### Install
 
@@ -13,30 +15,38 @@ python -m pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-### Preview the sheet list / URLs (no download)
+### Preview the built-in array (no download)
+
+```bash
+python scripts/download_tdop.py --list-sheets
+```
+
+The default run uses `TDOP_SHEETS` from the script. To customize it, edit that list in `scripts/download_tdop.py`. You can also select specific sheets directly; repeat `--sheet` for each one:
+
+```bash
+python scripts/download_tdop.py \
+  --sheet 1-SE-D \
+  --sheet 2-NE-C \
+  --dry-run
+```
+
+To read the list from a TDOP specification PDF instead, pass its path. With `--pdf` and no `--sheet`, all sheets in that PDF are selected; `--sheet` can limit that selection:
 
 ```bash
 python scripts/download_tdop.py \
   --pdf "/path/to/Technical Specifications of TDOP (Dec 2024 - Jan 2025).pdf" \
   --list-sheets
-
-python scripts/download_tdop.py \
-  --pdf "/path/to/Technical Specifications of TDOP (Dec 2024 - Jan 2025).pdf" \
-  --sheet 1-SE-D
 ```
 
-The second command prints the URL and remains a dry run. To download just the example tile:
+### Download
+
+A real download asks you to type `DOWNLOAD`. For example, to download just the example tile using the built-in list:
 
 ```bash
-python scripts/download_tdop.py \
-  --pdf "/path/to/Technical Specifications of TDOP (Dec 2024 - Jan 2025).pdf" \
-  --sheet 1-SE-D \
-  --download
+python scripts/download_tdop.py --sheet 1-SE-D --download
 ```
 
-A real download asks you to type `DOWNLOAD`. The file is saved under `~/Downloads/HKMS_TDOP` unless `--out-dir` is provided. Re-running the script skips tiles already recorded as downloaded and still present at the expected size.
-
-To download all sheets in the PDF, omit `--sheet` and use `--download`; review the selected sheet list and disk space before confirming. `--limit N` can cap a pilot run. `--yes` skips the interactive confirmation and should be used only when the full scope and storage are intentional.
+To download the default array, use `--download` without `--pdf` or `--sheet`. Review the selected sheets and disk-space estimate before confirming. `--limit N` can cap a pilot run. The file is saved under `~/Downloads/HKMS_TDOP` unless `--out-dir` is provided. Re-running the script skips tiles already recorded as downloaded and still present at the expected size. `--yes` skips the interactive confirmation and should only be used when the scope and storage are intentional.
 
 ### Verification and limits
 

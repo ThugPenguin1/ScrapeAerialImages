@@ -26,6 +26,44 @@ PRODUCT_FORMAT = "TIFF"
 LOCALE = "en"
 APPROX_TILE_MB = 520
 
+# Edit this list to control the default selection. When neither --pdf nor --sheet
+# is supplied, the downloader reads these sheet IDs in order. These 192 IDs come
+# from the supplied December 2024–January 2025 TDOP specification PDF.
+TDOP_SHEETS = [
+    "1-SE-D", "2-NE-C", "2-NE-D", "2-SE-A", "2-SE-B", "2-SE-C",
+    "2-SE-D", "2-SW-B", "2-SW-C", "2-SW-D", "3-NE-A", "3-NE-B",
+    "3-NE-C", "3-NE-D", "3-NW-A", "3-NW-B", "3-NW-C", "3-NW-D",
+    "3-SE-A", "3-SE-B", "3-SE-C", "3-SE-D", "3-SW-A", "3-SW-B",
+    "3-SW-C", "3-SW-D", "4-NW-A", "4-NW-B", "4-NW-C", "4-NW-D",
+    "4-SE-A", "4-SE-C", "4-SE-D", "4-SW-A", "4-SW-B", "4-SW-C",
+    "4-SW-D", "5-NE-B", "5-NE-C", "5-NE-D", "5-SE-A", "5-SE-B",
+    "5-SE-C", "5-SE-D", "5-SW-B", "5-SW-D", "6-NE-A", "6-NE-B",
+    "6-NE-C", "6-NE-D", "6-NW-A", "6-NW-B", "6-NW-C", "6-NW-D",
+    "6-SE-A", "6-SE-B", "6-SE-C", "6-SE-D", "6-SW-A", "6-SW-B",
+    "6-SW-C", "6-SW-D", "7-NE-A", "7-NE-B", "7-NE-C", "7-NE-D",
+    "7-NW-A", "7-NW-B", "7-NW-C", "7-NW-D", "7-SE-A", "7-SE-B",
+    "7-SE-C", "7-SE-D", "7-SW-A", "7-SW-B", "7-SW-C", "7-SW-D",
+    "8-NE-A", "8-NE-B", "8-NE-C", "8-NE-D", "8-NW-A", "8-NW-B",
+    "8-NW-C", "8-NW-D", "8-SE-A", "8-SE-B", "8-SE-C", "8-SE-D",
+    "8-SW-A", "8-SW-B", "8-SW-C", "8-SW-D", "9-NE-A", "9-NE-B",
+    "9-NE-C", "9-NE-D", "9-NW-B", "9-NW-D", "9-SE-A", "9-SE-B",
+    "9-SE-C", "9-SE-D", "9-SW-A", "9-SW-B", "9-SW-C", "9-SW-D",
+    "10-NE-A", "10-NE-B", "10-NE-C", "10-NE-D", "10-NW-A", "10-NW-B",
+    "10-NW-C", "10-NW-D", "10-SE-A", "10-SE-B", "10-SE-C", "10-SW-A",
+    "10-SW-B", "10-SW-C", "10-SW-D", "11-NE-A", "11-NE-B", "11-NE-C",
+    "11-NE-D", "11-NW-A", "11-NW-B", "11-NW-C", "11-NW-D", "11-SE-A",
+    "11-SE-B", "11-SE-C", "11-SE-D", "11-SW-A", "11-SW-B", "11-SW-C",
+    "11-SW-D", "12-NE-A", "12-NE-B", "12-NE-C", "12-NE-D", "12-NW-A",
+    "12-NW-B", "12-NW-C", "12-NW-D", "12-SE-A", "12-SE-C", "12-SW-A",
+    "12-SW-B", "12-SW-C", "12-SW-D", "13-NE-A", "13-NE-B", "13-NE-C",
+    "13-NE-D", "13-NW-A", "13-NW-B", "13-NW-C", "13-NW-D", "13-SE-A",
+    "13-SE-C", "13-SW-B", "14-NE-A", "14-NE-B", "14-NE-C", "14-NE-D",
+    "14-NW-A", "14-NW-B", "14-NW-C", "14-NW-D", "14-SE-B", "14-SW-A",
+    "15-NE-A", "15-NE-B", "15-NE-C", "15-NE-D", "15-NW-A", "15-NW-B",
+    "15-NW-C", "15-NW-D", "15-SE-B", "15-SE-D", "15-SW-A", "16-NW-A",
+    "16-SW-A", "16-SW-B", "16-SW-C", "17-NW-A", "17-NW-C", "17-SW-C",
+]
+
 SHEET_RE = re.compile(r"^(?P<map_no>\d{1,2})-(?P<quadrant>NE|NW|SE|SW)-(?P<quarter>[A-D])$", re.I)
 # In the supplied TDOP specification, the file-name/extent table has one row per
 # available tile: sheet number, file stem, then four HK80 extent coordinates.
@@ -117,9 +155,18 @@ def select_tiles(
     requested_sheets: Iterable[str] | None,
     limit: int | None,
 ) -> list[Tile]:
-    requested = [normalize_sheet(s) for s in (requested_sheets or [])]
+    requested_values = list(requested_sheets or [])
+    if pdf_tiles is None and not requested_values:
+        requested_values = TDOP_SHEETS
+    requested = [normalize_sheet(s) for s in requested_values]
     if pdf_tiles is None:
-        tiles = [Tile(sheet_no=s) for s in requested]
+        # De-duplicate while preserving the array/CLI order.
+        tiles = []
+        seen: set[str] = set()
+        for sheet in requested:
+            if sheet not in seen:
+                tiles.append(Tile(sheet_no=sheet))
+                seen.add(sheet)
     elif requested:
         by_sheet = {tile.sheet_no: tile for tile in pdf_tiles}
         missing = [sheet for sheet in requested if sheet not in by_sheet]
@@ -382,9 +429,13 @@ async def download_tiles(args: argparse.Namespace, tiles: list[Tile]) -> int:
 
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Read TDOP tile numbers from LandsD's PDF and click each official download button."
+        description="Read TDOP sheets from the built-in array or a LandsD PDF, then click official download buttons."
     )
-    parser.add_argument("--pdf", type=Path, help="TDOP technical-specification PDF containing the tile table")
+    parser.add_argument(
+        "--pdf",
+        type=Path,
+        help="Optional TDOP specification PDF; without it, use TDOP_SHEETS or explicit --sheet values",
+    )
     parser.add_argument(
         "--sheet",
         action="append",
@@ -413,8 +464,6 @@ def main() -> int:
     parser = make_parser()
     args = parser.parse_args()
 
-    if not args.pdf and not args.sheet:
-        parser.error("provide --pdf or at least one --sheet")
     if args.delay < 0:
         parser.error("--delay cannot be negative")
 
